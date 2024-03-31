@@ -1,0 +1,87 @@
+delimiter //
+
+CREATE PROCEDURE export_partitions_by_month
+(IN int_id int(11),
+IN in_table_schema varchar(64),
+IN in_table_name varchar(64),
+IN in_partition_begin_month varchar(7),
+IN in_partition_end_month varchar(7),
+IN in_partitioning_key varchar(64))
+
+ProcExit:BEGIN
+
+  DECLARE loop_cnt tinyint;
+  DECLARE partition_count tinyint;
+  DECLARE max_value varchar(8);
+  DECLARE begin_partition varchar(64);
+  DECLARE end_partition varchar(64);
+  DECLARE remove_partition_name varchar(64);
+  DECLARE remove_partition_start_date date;
+  DECLARE remove_partition_end_date date;
+  DECLARE remove_partition_description varchar(64);
+
+  If in_partition_begin_month not regexp '[20][0-9][0-9][_][01-12]' THEN
+     select 'ERROR: Begin month not in format YYYY_MM';
+     LEAVE ProcExit;
+  end if;
+
+  If in_partition_end_month not regexp '[20][0-9][0-9][_][01-12]' THEN
+     select 'ERROR: End month not in format YYYY_MM';
+     LEAVE ProcExit;
+  end if;
+
+  if in_partition_begin_month > in_partition_end_month THEN
+     select 'ERROR: Begin month is greater than end month';
+     LEAVE ProcExit;
+  end if;
+
+
+  SET begin_partition = CONCAT('PART_' , in_table_name , '_' , in_partition_begin_month);
+  SET end_partition   = CONCAT('PART_' , in_table_name , '_' , in_partition_end_month);
+
+  SET max_value = 'MAXVALUE';
+  SET partition_count = 0;
+  SET loop_cnt = 0;
+
+  select count(*) into partition_count
+  from information_schema.partitions
+  where table_schema = in_table_schema
+  and table_name = in_table_name
+  and partition_description != max_value
+  and partition_name between begin_partition and end_partition;
+
+
+  if  partition_count = 0 THEN
+      select 'ERROR: No partitions found to extract';
+      LEAVE ProcExit;
+  end if;
+
+  while partition_count > 0 do
+
+      select partition_name,
+             convert(substr(partition_description,2,10),date),
+             DATE_SUB(convert(substr(partition_description,2,10),date), INTERVAL 1 MONTH),
+             partition_description
+      into   remove_partition_name,
+             remove_partition_end_date,
+             remove_partition_start_date,
+             remove_partition_description
+      from information_schema.partitions
+      where table_schema = in_table_schema
+      and table_name = in_table_name
+      and partition_name between begin_partition and end_partition
+      and partition_description != max_value
+      order by partition_description asc limit loop_cnt, 1;
+
+
+      select concat('mysqldump --user=archive_rw --password=****** --single-transaction --verbose --no-create-info --quick --where="', in_partitioning_key,' >= ''', remove_partition_start_date,'''', ' and ', in_partitioning_key, ' < ''', remove_partition_end_date, '''" ', in_table_schema, ' ', in_table_name, ' | gzip -c > /mnt/backups/archive/archiving_mvc/bin/tiber12.', in_table_schema, '.', in_table_name, '.', remove_partition_name, '_$(date +%Y.%m.%d.%H%M%S).sql.gz');
+
+      SET loop_cnt = loop_cnt + 1;
+      SET partition_count = partition_count - 1;
+
+  end while;
+
+END
+//
+
+delimiter ;
