@@ -11,7 +11,7 @@ select
    first_name,
    last_name,
    order_amount,
-   orer_date
+   order_date
      INTO OUTFILE 'orders.csv'
      FIELDS TERMINATED BY ','
      LINES TERMINATED BY '\n'
