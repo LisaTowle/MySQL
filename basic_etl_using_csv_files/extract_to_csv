@@ -1,0 +1,18 @@
+use fin_data;
+select
+   concat(
+   substr(lower(hex(uuid)),1,8), '-',
+   substr(lower(hex(uuid)),9,4), '-',
+   substr(lower(hex(uuid)),13,4),'-',
+   substr(lower(hex(uuid)),17,4),'-',
+   substr(lower(hex(uuid)),21,12)
+   ) as userUuid,
+   email,
+   first_name,
+   last_name,
+   order_amount,
+   orer_date
+     INTO OUTFILE 'orders.csv'
+     FIELDS TERMINATED BY ','
+     LINES TERMINATED BY '\n'
+from orders;
