@@ -1,4 +1,3 @@
 # MySQL
-MySQL
 
-**partitioning**: Maintain partitions for a table based on YYYY-MM
+This repo contains common scripts used for MySQL tasks.
